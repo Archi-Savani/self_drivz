@@ -47,6 +47,10 @@ const carSchema = new mongoose.Schema(
             enum: ["Pending", "Approved"],
             default: "Pending",
         },
+        features: {
+            type: [String], // array of car features
+            default: [],
+        },
     },
     {
         timestamps: true,

@@ -1,6 +1,6 @@
 // controllers/carController.js
 const Car = require("../models/Car");
-const { uploadMultipleFiles } = require("../utils/uploadMultipleFiles"); // your cloudinary function
+const { uploadMultipleFiles } = require("../utils/uploadMultipleFiles"); // cloudinary util
 
 // Add Car - Only FleetOwner (role != Rider)
 const addCar = async (req, res) => {
@@ -9,10 +9,10 @@ const addCar = async (req, res) => {
             return res.status(403).json({ success: false, message: "Only FleetOwner can add cars" });
         }
 
-        const { name, category, hourlyRate, kmPerHour, transmission, fuel } = req.body;
+        const { name, category, hourlyRate, kmPerHour, transmission, fuel, features } = req.body;
 
         if (!name || !category || !hourlyRate || !kmPerHour || !transmission || !fuel) {
-            return res.status(400).json({ success: false, message: "All fields are required" });
+            return res.status(400).json({ success: false, message: "All required fields are required" });
         }
 
         // Upload images
@@ -37,9 +37,10 @@ const addCar = async (req, res) => {
             kmPerHour,
             transmission,
             fuel,
+            features: features ? features.split(",").map(f => f.trim()) : [], // accept comma-separated features
             carImages,
             video: videoUrl,
-            status: "Pending", // default
+            status: "Pending",
         });
 
         await newCar.save();
@@ -82,8 +83,10 @@ const updateCar = async (req, res) => {
             return res.status(403).json({ success: false, message: "Only FleetOwner can update cars" });
         }
 
-        const { category, hourlyRate, kmPerHour, transmission, fuel } = req.body;
+        const { category, hourlyRate, kmPerHour, transmission, fuel, features } = req.body;
         const updatedData = { category, hourlyRate, kmPerHour, transmission, fuel };
+
+        if (features) updatedData.features = features.split(",").map(f => f.trim());
 
         // Upload new images if provided
         if (req.files && req.files.carImages) {
@@ -126,7 +129,7 @@ const deleteCar = async (req, res) => {
 // Approve car - Admin only
 const approveCar = async (req, res) => {
     try {
-        if (req.user.role !== "Admin") {
+        if (req.user.role !== "admin") {
             return res.status(403).json({ success: false, message: "Only admin can approve cars" });
         }
 

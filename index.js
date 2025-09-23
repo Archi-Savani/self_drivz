@@ -5,6 +5,8 @@ const dotenv = require("dotenv");
 
 const userRoutes = require("./routes/user");
 const carRoutes = require("./routes/car");
+const adminOfferRoutes = require("./routes/adminOffer");
+const adminBannerRoutes = require("./routes/adminBanner");
 
 dotenv.config();
 
@@ -17,6 +19,8 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use("/api/user", userRoutes);
 app.use("/api/car", carRoutes);
+app.use("/api/adminOffer", adminOfferRoutes);
+app.use("/api/adminBanner", adminBannerRoutes);
 
 const connectDB = async () => {
     try {

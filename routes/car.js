@@ -2,7 +2,7 @@
 const express = require("express");
 const router = express.Router();
 const carController = require("../controllers/car");
-const auth = require("../middlewares/auth");
+const {auth} = require("../middlewares/auth");
 const multer = require("multer");
 
 // Multer setup for memory storage (needed for Cloudinary upload)
@@ -43,5 +43,6 @@ router.put(
 
 // Delete car
 router.delete("/:id", auth, carController.deleteCar);
+router.put("/:id/approve", auth, carController.approveCar);
 
 module.exports = router;

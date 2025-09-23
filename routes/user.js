@@ -11,7 +11,7 @@ const {
     updateUserRole,
     getMe,
 } = require("../controllers/user");
-const auth = require("../middlewares/auth");
+const {auth} = require("../middlewares/auth");
 
 const router = express.Router();
 const upload = multer(); // stores files in memory
@@ -24,6 +24,8 @@ router.put("/:id", auth, upload.single("photo"), uploadSingleImage, updateProfil
 router.delete("/:id", deleteUser);
 
 // Role update (protected)
-router.put("/role", auth, updateUserRole);
+// routes/userRoutes.js
+router.put("/:id/role", auth, updateUserRole);
+
 
 module.exports = router;

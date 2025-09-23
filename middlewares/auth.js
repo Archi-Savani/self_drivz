@@ -15,11 +15,7 @@ const auth = async (req, res, next) => {
         const user = await User.findById(decoded.id);
         if (!user) return res.status(401).json({ success: false, message: "Unauthorized: User not found" });
 
-        req.user = {
-            id: user._id,
-            phone: user.phone,
-            role: user.role,
-        };
+        req.user = user
 
         next();
     } catch (error) {
@@ -27,4 +23,11 @@ const auth = async (req, res, next) => {
     }
 };
 
-module.exports = auth;
+const requireAdmin = (req, res, next) => {
+    if (!req.user || req.user.role !== "admin") {
+        return res.status(403).json({ success: false, message: "Forbidden: admin only" });
+    }
+    next();
+};
+
+module.exports = {auth, requireAdmin};
