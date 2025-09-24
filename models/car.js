@@ -14,6 +14,11 @@ const carSchema = new mongoose.Schema(
             trim: true,
             enum: ["Sedan", "SUV", "Hatchback", "Luxury", "Van", "Other"],
         },
+        seating: {
+            type: String,
+            required: true,
+            enum: ["5 Seater", "7 Seater", "8 Seater"], // Seating options
+        },
         hourlyRate: {
             type: Number,
             required: true,
@@ -41,6 +46,22 @@ const carSchema = new mongoose.Schema(
         },
         video: {
             type: String, // video URL or path
+        },
+        insurancePhoto: {
+            type: String, // single image URL
+            required: true,
+        },
+        pollutionCertificate: {
+            type: String, // single image URL
+            required: true,
+        },
+        taxToken: {
+            type: String, // single image URL
+            required: true,
+        },
+        rcBook: {
+            type: String, // single image URL
+            required: true,
         },
         status: {
             type: String,

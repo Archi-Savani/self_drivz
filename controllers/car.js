@@ -9,13 +9,13 @@ const addCar = async (req, res) => {
             return res.status(403).json({ success: false, message: "Only FleetOwner can add cars" });
         }
 
-        const { name, category, hourlyRate, kmPerHour, transmission, fuel, features } = req.body;
+        const { name, category, seating, hourlyRate, kmPerHour, transmission, fuel, features } = req.body;
 
-        if (!name || !category || !hourlyRate || !kmPerHour || !transmission || !fuel) {
+        if (!name || !category || !seating || !hourlyRate || !kmPerHour || !transmission || !fuel) {
             return res.status(400).json({ success: false, message: "All required fields are required" });
         }
 
-        // Upload images
+        // Upload multiple car images
         let carImages = [];
         if (req.files && req.files.carImages) {
             const fileBuffers = req.files.carImages.map(f => f.buffer);
@@ -30,16 +30,46 @@ const addCar = async (req, res) => {
             videoUrl = uploadedVideo;
         }
 
+        // Upload single document images
+        let insurancePhoto = "";
+        if (req.files && req.files.insurancePhoto && req.files.insurancePhoto[0]) {
+            const [uploaded] = await uploadMultipleFiles([req.files.insurancePhoto[0].buffer]);
+            insurancePhoto = uploaded;
+        }
+
+        let pollutionCertificate = "";
+        if (req.files && req.files.pollutionCertificate && req.files.pollutionCertificate[0]) {
+            const [uploaded] = await uploadMultipleFiles([req.files.pollutionCertificate[0].buffer]);
+            pollutionCertificate = uploaded;
+        }
+
+        let taxToken = "";
+        if (req.files && req.files.taxToken && req.files.taxToken[0]) {
+            const [uploaded] = await uploadMultipleFiles([req.files.taxToken[0].buffer]);
+            taxToken = uploaded;
+        }
+
+        let rcBook = "";
+        if (req.files && req.files.rcBook && req.files.rcBook[0]) {
+            const [uploaded] = await uploadMultipleFiles([req.files.rcBook[0].buffer]);
+            rcBook = uploaded;
+        }
+
         const newCar = new Car({
             name,
             category,
+            seating,
             hourlyRate,
             kmPerHour,
             transmission,
             fuel,
-            features: features ? features.split(",").map(f => f.trim()) : [], // accept comma-separated features
+            features: features ? features.split(",").map(f => f.trim()) : [],
             carImages,
             video: videoUrl,
+            insurancePhoto,
+            pollutionCertificate,
+            taxToken,
+            rcBook,
             status: "Pending",
         });
 
@@ -83,8 +113,8 @@ const updateCar = async (req, res) => {
             return res.status(403).json({ success: false, message: "Only FleetOwner can update cars" });
         }
 
-        const { category, hourlyRate, kmPerHour, transmission, fuel, features } = req.body;
-        const updatedData = { category, hourlyRate, kmPerHour, transmission, fuel };
+        const { category, seating, hourlyRate, kmPerHour, transmission, fuel, features } = req.body;
+        const updatedData = { category, seating, hourlyRate, kmPerHour, transmission, fuel };
 
         if (features) updatedData.features = features.split(",").map(f => f.trim());
 
@@ -99,6 +129,27 @@ const updateCar = async (req, res) => {
             const fileBuffer = req.files.video[0].buffer;
             const [uploadedVideo] = await uploadMultipleFiles([fileBuffer]);
             updatedData.video = uploadedVideo;
+        }
+
+        // Upload new single docs if provided
+        if (req.files && req.files.insurancePhoto && req.files.insurancePhoto[0]) {
+            const [uploaded] = await uploadMultipleFiles([req.files.insurancePhoto[0].buffer]);
+            updatedData.insurancePhoto = uploaded;
+        }
+
+        if (req.files && req.files.pollutionCertificate && req.files.pollutionCertificate[0]) {
+            const [uploaded] = await uploadMultipleFiles([req.files.pollutionCertificate[0].buffer]);
+            updatedData.pollutionCertificate = uploaded;
+        }
+
+        if (req.files && req.files.taxToken && req.files.taxToken[0]) {
+            const [uploaded] = await uploadMultipleFiles([req.files.taxToken[0].buffer]);
+            updatedData.taxToken = uploaded;
+        }
+
+        if (req.files && req.files.rcBook && req.files.rcBook[0]) {
+            const [uploaded] = await uploadMultipleFiles([req.files.rcBook[0].buffer]);
+            updatedData.rcBook = uploaded;
         }
 
         const car = await Car.findByIdAndUpdate(req.params.id, updatedData, { new: true });
