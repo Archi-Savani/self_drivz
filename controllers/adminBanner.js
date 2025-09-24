@@ -1,5 +1,5 @@
 // controllers/adminBannerController.js
-const AdminBanner = require("../models/AdminBanner");
+const AdminBanner = require("../models/adminBanner");
 const { uploadMultipleFiles } = require("../utils/cloudinary"); // cloudinary upload util
 
 // Add Banner - Only Admin

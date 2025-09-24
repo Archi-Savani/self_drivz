@@ -1,5 +1,5 @@
 // controllers/carController.js
-const Car = require("../models/Car");
+const Car = require("../models/car");
 const { uploadMultipleFiles } = require("../utils/uploadMultipleFiles"); // cloudinary util
 
 // Add Car - Only FleetOwner (role != Rider)
