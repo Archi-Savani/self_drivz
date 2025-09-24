@@ -24,10 +24,27 @@ const auth = async (req, res, next) => {
 };
 
 const requireAdmin = (req, res, next) => {
-    if (!req.user || req.user.role !== "admin") {
+    const role = req.user?.role?.toLowerCase?.();
+    if (role !== "admin") {
         return res.status(403).json({ success: false, message: "Forbidden: admin only" });
     }
     next();
 };
 
-module.exports = {auth, requireAdmin};
+const requireRider = (req, res, next) => {
+    const role = req.user?.role?.toLowerCase?.();
+    if (role !== "rider") {
+        return res.status(403).json({ success: false, message: "Forbidden: rider only" });
+    }
+    next();
+};
+
+const requireFleetOwner = (req, res, next) => {
+    const role = req.user?.role?.toLowerCase?.();
+    if (role !== "fleetowner") {
+        return res.status(403).json({ success: false, message: "Forbidden: fleet owner only" });
+    }
+    next();
+};
+
+module.exports = {auth, requireAdmin, requireRider, requireFleetOwner};

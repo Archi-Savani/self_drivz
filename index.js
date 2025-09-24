@@ -8,6 +8,9 @@ const carRoutes = require("./routes/car");
 const adminOfferRoutes = require("./routes/adminOffer");
 const adminBannerRoutes = require("./routes/adminBanner");
 const kycRoutes = require("./routes/kyc");
+const privacyRoutes = require("./routes/privacy");
+const termsRoutes = require("./routes/terms");
+const rideRoutes = require("./routes/ride");
 
 dotenv.config();
 
@@ -23,6 +26,9 @@ app.use("/api/car", carRoutes);
 app.use("/api/adminOffer", adminOfferRoutes);
 app.use("/api/adminBanner", adminBannerRoutes);
 app.use("/api/kyc", kycRoutes);
+app.use("/api/privacy", privacyRoutes);
+app.use("/api/terms", termsRoutes);
+app.use("/api/ride", rideRoutes);
 
 const connectDB = async () => {
     try {

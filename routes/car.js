@@ -2,7 +2,8 @@
 const express = require("express");
 const router = express.Router();
 const carController = require("../controllers/car");
-const { auth } = require("../middlewares/auth");
+const { auth, requireFleetOwner, requireAdmin } = require("../middlewares/auth");
+const { ensureApprovedKyc } = require("../middlewares/kyc");
 const multer = require("multer");
 
 // Multer setup for memory storage (needed for Cloudinary upload)
@@ -19,10 +20,12 @@ router.get("/:id", auth, carController.getCarById); // get single car
 // Protected routes (FleetOwner only can add/update/delete)
 // ----------------------
 
-// Add car (multiple images + video + docs)
+// Add car (multiple images + 1 video)
 router.post(
     "/",
     auth,
+    requireFleetOwner,
+    ensureApprovedKyc,
     upload.fields([
         { name: "carImages", maxCount: 10 },
         { name: "video", maxCount: 1 },
@@ -38,6 +41,8 @@ router.post(
 router.put(
     "/:id",
     auth,
+    requireFleetOwner,
+    ensureApprovedKyc,
     upload.fields([
         { name: "carImages", maxCount: 10 },
         { name: "video", maxCount: 1 },
@@ -50,9 +55,9 @@ router.put(
 );
 
 // Delete car
-router.delete("/:id", auth, carController.deleteCar);
+router.delete("/:id", auth, requireFleetOwner, carController.deleteCar);
 
 // Approve car (admin only)
-router.put("/:id/approve", auth, carController.approveCar);
+router.put("/:id/approve", auth, requireAdmin, carController.approveCar);
 
 module.exports = router;
