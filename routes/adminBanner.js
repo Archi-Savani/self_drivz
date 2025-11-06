@@ -19,18 +19,18 @@ router.get("/", auth, adminBannerController.getBanners);
 // Admin-only routes
 // ----------------------
 
-// Add a banner (image/video)
+// Add banners (1-5 images)
 router.post(
     "/",
     auth, // logged-in user
-    upload.fields([{ name: "bannerImage", maxCount: 1 }]), // single file
+    upload.fields([{ name: "bannerImage", maxCount: 5 }]), // up to 5 files
     adminBannerController.addBanner
 );
 
 router.put(
     "/:id",
     auth,
-    upload.fields([{ name: "bannerImage", maxCount: 1 }]),
+    upload.fields([{ name: "bannerImage", maxCount: 5 }]),
     adminBannerController.updateBanner
 );
 

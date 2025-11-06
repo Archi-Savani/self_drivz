@@ -2,41 +2,32 @@
 const AdminBanner = require("../models/adminBanner");
 const { uploadMultipleFiles } = require("../utils/cloudinary"); // cloudinary upload util
 
-// Add Banner - Only Admin
+// Add Banner - Only Admin (up to 5 images)
 const addBanner = async (req, res) => {
     try {
-        if (req.user.role !== "admin") {
+        const role = (req.user?.role || "").toString().trim().toLowerCase();
+        if (role !== "admin") {
             return res.status(403).json({
                 success: false,
                 message: "Only Admin can add a banner",
             });
         }
 
-        const { title, subtitle, mediaType } = req.body;
-
-        if (!title || !mediaType) {
-            return res.status(400).json({
-                success: false,
-                message: "Title and mediaType are required",
-            });
-        }
-
         if (!req.files || !req.files.bannerImage || req.files.bannerImage.length === 0) {
             return res.status(400).json({
                 success: false,
-                message: "Please upload a banner image or video",
+                message: "Please upload 1-5 banner images",
             });
         }
 
-        const fileBuffer = req.files.bannerImage[0].buffer;
-        const [uploadedUrl] = await uploadMultipleFiles([fileBuffer]);
+        if (req.files.bannerImage.length > 5) {
+            return res.status(400).json({ success: false, message: "Maximum 5 images allowed" });
+        }
 
-        const newBanner = new AdminBanner({
-            bannerImage: uploadedUrl,
-            title,
-            subtitle,
-            mediaType,
-        });
+        const buffers = req.files.bannerImage.map(f => f.buffer);
+        const uploadedUrls = await uploadMultipleFiles(buffers);
+
+        const newBanner = new AdminBanner({ bannerImage: uploadedUrls });
 
         await newBanner.save();
 
@@ -68,24 +59,26 @@ const getBanners = async (req, res) => {
     }
 };
 
-// Update banner - Only Admin
+// Update banner - Only Admin (replace up to 5 images)
 const updateBanner = async (req, res) => {
     try {
-        if (req.user.role !== "Admin") {
+        const role = (req.user?.role || "").toString().trim().toLowerCase();
+        if (role !== "admin") {
             return res.status(403).json({
                 success: false,
                 message: "Only Admin can update a banner",
             });
         }
-
-        const { title, subtitle, mediaType } = req.body;
-        const updatedData = { title, subtitle, mediaType };
+        const updatedData = {};
 
         // Upload new banner image/video if provided
         if (req.files && req.files.bannerImage && req.files.bannerImage.length > 0) {
-            const fileBuffer = req.files.bannerImage[0].buffer;
-            const [uploadedUrl] = await uploadMultipleFiles([fileBuffer]);
-            updatedData.bannerImage = uploadedUrl;
+            if (req.files.bannerImage.length > 5) {
+                return res.status(400).json({ success: false, message: "Maximum 5 images allowed" });
+            }
+            const buffers = req.files.bannerImage.map(f => f.buffer);
+            const uploadedUrls = await uploadMultipleFiles(buffers);
+            updatedData.bannerImage = uploadedUrls;
         }
 
         const banner = await AdminBanner.findByIdAndUpdate(req.params.id, updatedData, { new: true });
@@ -113,7 +106,8 @@ const updateBanner = async (req, res) => {
 // Delete banner - Only Admin
 const deleteBanner = async (req, res) => {
     try {
-        if (req.user.role !== "Admin") {
+        const role = (req.user?.role || "").toString().trim().toLowerCase();
+        if (role !== "admin") {
             return res.status(403).json({
                 success: false,
                 message: "Only Admin can delete a banner",

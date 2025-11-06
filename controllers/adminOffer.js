@@ -1,10 +1,34 @@
 // controllers/adminOfferController.js
 const AdminOffer = require("../models/adminOffer");
 
-// ✅ Create Offer
+// ✅ Create Offer (admin only via route guard)
 const createOffer = async (req, res) => {
     try {
-        const newOffer = new AdminOffer(req.body);
+        const {
+            offerFor,
+            title,
+            offerCode,
+            subtitle,
+            discount,
+            termsAndCondition,
+            expiryDate,
+        } = req.body;
+
+        if (!offerFor || !title || !offerCode || discount === undefined || !expiryDate) {
+            return res.status(400).json({ success: false, message: "offerFor, title, offerCode, discount, expiryDate are required" });
+        }
+
+        const payload = {
+            offerFor: String(offerFor).toLowerCase(),
+            title,
+            offerCode,
+            subtitle,
+            discount,
+            termsAndCondition,
+            expiryDate,
+        };
+
+        const newOffer = new AdminOffer(payload);
         await newOffer.save();
         res.status(201).json({
             success: true,
@@ -53,14 +77,29 @@ const getOfferById = async (req, res) => {
     }
 };
 
-// ✅ Update Offer
+// ✅ Update Offer (admin only via route guard)
 const updateOffer = async (req, res) => {
     try {
-        const updatedOffer = await AdminOffer.findByIdAndUpdate(
-            req.params.id,
-            req.body,
-            { new: true }
-        );
+        const {
+            offerFor,
+            title,
+            offerCode,
+            subtitle,
+            discount,
+            termsAndCondition,
+            expiryDate,
+        } = req.body;
+
+        const update = {};
+        if (offerFor !== undefined) update.offerFor = String(offerFor).toLowerCase();
+        if (title !== undefined) update.title = title;
+        if (offerCode !== undefined) update.offerCode = offerCode;
+        if (subtitle !== undefined) update.subtitle = subtitle;
+        if (discount !== undefined) update.discount = discount;
+        if (termsAndCondition !== undefined) update.termsAndCondition = termsAndCondition;
+        if (expiryDate !== undefined) update.expiryDate = expiryDate;
+
+        const updatedOffer = await AdminOffer.findByIdAndUpdate(req.params.id, update, { new: true });
         if (!updatedOffer) {
             return res
                 .status(404)

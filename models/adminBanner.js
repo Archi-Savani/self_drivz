@@ -4,23 +4,14 @@ const mongoose = require("mongoose");
 const adminBannerSchema = new mongoose.Schema(
     {
         bannerImage: {
-            type: String, // URL of image or video (stored on Cloudinary or other storage)
+            type: [String], // array of image URLs (Cloudinary)
             required: true,
-            trim: true,
-        },
-        title: {
-            type: String,
-            required: true,
-            trim: true,
-        },
-        subtitle: {
-            type: String,
-            trim: true,
-        },
-        mediaType: {
-            type: String,
-            enum: ["image", "video"], // To differentiate
-            required: true,
+            validate: [
+                function(value) {
+                    return Array.isArray(value) && value.length > 0 && value.length <= 5;
+                },
+                "bannerImage must have between 1 and 5 images",
+            ],
         },
     },
     {

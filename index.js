@@ -7,10 +7,12 @@ const userRoutes = require("./routes/user");
 const carRoutes = require("./routes/car");
 const adminOfferRoutes = require("./routes/adminOffer");
 const adminBannerRoutes = require("./routes/adminBanner");
-const kycRoutes = require("./routes/kyc");
+const riderKycRoutes = require("./routes/riderKyc");
+const fleetOwnerKycRoutes = require("./routes/fleetOwnerKyc");
 const privacyRoutes = require("./routes/privacy");
 const termsRoutes = require("./routes/terms");
 const rideRoutes = require("./routes/ride");
+const adventureRoutes = require("./routes/adventure");
 
 dotenv.config();
 
@@ -25,13 +27,25 @@ app.use("/api/user", userRoutes);
 app.use("/api/car", carRoutes);
 app.use("/api/adminOffer", adminOfferRoutes);
 app.use("/api/adminBanner", adminBannerRoutes);
-app.use("/api/kyc", kycRoutes);
+app.use("/api/rider-kyc", riderKycRoutes);
+app.use("/api/kyc-fleet-owner", fleetOwnerKycRoutes);
 app.use("/api/privacy", privacyRoutes);
 app.use("/api/terms", termsRoutes);
 app.use("/api/ride", rideRoutes);
+app.use("/api/adventures", adventureRoutes);
 
 const connectDB = async () => {
     try {
+        if (!process.env.DB_CONNECTION_STRING) {
+            console.error("Error: DB_CONNECTION_STRING is not defined in .env file");
+            console.error("Please create a .env file with the following variables:");
+            console.error("  DB_CONNECTION_STRING=your_mongodb_connection_string");
+            console.error("  JWT_SECRET=your_jwt_secret");
+            console.error("  CLOUD_NAME=your_cloudinary_cloud_name");
+            console.error("  CLOUD_API_KEY=your_cloudinary_api_key");
+            console.error("  CLOUD_API_SECRET=your_cloudinary_api_secret");
+            process.exit(1);
+        }
         await mongoose.connect(process.env.DB_CONNECTION_STRING);
         console.log("MongoDB connected successfully.");
     } catch (error) {
