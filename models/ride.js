@@ -1,33 +1,17 @@
 const mongoose = require("mongoose");
 
+const LocationPointSchema = new mongoose.Schema(
+    {
+        longitude: { type: Number, required: true },
+        latitude: { type: Number, required: true },
+    },
+    { _id: false }
+);
+
 const LocationSchema = new mongoose.Schema(
     {
-        mode: { type: String, enum: ["live", "manual"], required: true },
-        live: {
-            type: new mongoose.Schema(
-                {
-                    latitude: { type: Number, required: true },
-                    longitude: { type: Number, required: true },
-                    accuracyMeters: { type: Number, default: 0 },
-                },
-                { _id: false }
-            ),
-            default: null,
-        },
-        manual: {
-            type: new mongoose.Schema(
-                {
-                    addressLine1: { type: String, required: true },
-                    addressLine2: { type: String, default: null },
-                    city: { type: String, required: true },
-                    state: { type: String, required: true },
-                    country: { type: String, required: true },
-                    postalCode: { type: String, required: true },
-                },
-                { _id: false }
-            ),
-            default: null,
-        },
+        from: { type: LocationPointSchema, required: true },
+        to: { type: LocationPointSchema, required: true },
     },
     { _id: false }
 );

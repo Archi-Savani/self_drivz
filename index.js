@@ -14,6 +14,7 @@ const privacyRoutes = require("./routes/privacy");
 const termsRoutes = require("./routes/terms");
 const rideRoutes = require("./routes/ride");
 const adventureRoutes = require("./routes/adventure");
+const ratingReviewRoutes = require("./routes/ratingReview");
 
 dotenv.config();
 
@@ -35,6 +36,7 @@ app.use("/api/privacy", privacyRoutes);
 app.use("/api/terms", termsRoutes);
 app.use("/api/ride", rideRoutes);
 app.use("/api/adventures", adventureRoutes);
+app.use("/api/rating-review", ratingReviewRoutes);
 
 const connectDB = async () => {
     try {

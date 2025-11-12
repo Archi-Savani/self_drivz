@@ -10,16 +10,42 @@ function validateRanges(date, time) {
 }
 
 function validateLocation(location) {
-    if (!location || !location.mode) return "location.mode is required";
-    if (!["live", "manual"].includes(location.mode)) return "location.mode must be live or manual";
-    if (location.mode === "live") {
-        if (!location.live) return "location.live is required when mode=live";
-        if (location.manual) return "location.manual must be null when mode=live";
+    if (!location) return "location is required";
+    if (!location.from) return "location.from is required";
+    if (!location.to) return "location.to is required";
+    
+    // Validate from location
+    if (typeof location.from.longitude !== "number" || isNaN(location.from.longitude)) {
+        return "location.from.longitude must be a valid number";
     }
-    if (location.mode === "manual") {
-        if (!location.manual) return "location.manual is required when mode=manual";
-        if (location.live) return "location.live must be null when mode=manual";
+    if (typeof location.from.latitude !== "number" || isNaN(location.from.latitude)) {
+        return "location.from.latitude must be a valid number";
     }
+    
+    // Validate to location
+    if (typeof location.to.longitude !== "number" || isNaN(location.to.longitude)) {
+        return "location.to.longitude must be a valid number";
+    }
+    if (typeof location.to.latitude !== "number" || isNaN(location.to.latitude)) {
+        return "location.to.latitude must be a valid number";
+    }
+    
+    // Validate longitude range (-180 to 180)
+    if (location.from.longitude < -180 || location.from.longitude > 180) {
+        return "location.from.longitude must be between -180 and 180";
+    }
+    if (location.to.longitude < -180 || location.to.longitude > 180) {
+        return "location.to.longitude must be between -180 and 180";
+    }
+    
+    // Validate latitude range (-90 to 90)
+    if (location.from.latitude < -90 || location.from.latitude > 90) {
+        return "location.from.latitude must be between -90 and 90";
+    }
+    if (location.to.latitude < -90 || location.to.latitude > 90) {
+        return "location.to.latitude must be between -90 and 90";
+    }
+    
     return null;
 }
 
@@ -86,9 +112,27 @@ exports.updateRide = async (req, res) => {
             const e = validateLocation(location);
             if (e) return res.status(400).json({ success: false, message: e });
         }
-        if (date || time) {
-            const e = validateRanges(date ?? { from: "0000-00-00", to: "9999-99-99" }, time ?? { from: "00:00", to: "23:59" });
-            if (e && (date || time)) return res.status(400).json({ success: false, message: e });
+        
+        // Validate date and time if both are provided, or validate individually
+        if (date && time) {
+            const e = validateRanges(date, time);
+            if (e) return res.status(400).json({ success: false, message: e });
+        } else if (date) {
+            // If only date is provided, validate date structure
+            if (!date.from || !date.to) {
+                return res.status(400).json({ success: false, message: "date.from and date.to are required" });
+            }
+            if (date.from > date.to) {
+                return res.status(400).json({ success: false, message: "date.from must be before or equal to date.to" });
+            }
+        } else if (time) {
+            // If only time is provided, validate time structure
+            if (!time.from || !time.to) {
+                return res.status(400).json({ success: false, message: "time.from and time.to are required" });
+            }
+            if (time.from >= time.to) {
+                return res.status(400).json({ success: false, message: "time.from must be before time.to" });
+            }
         }
 
         const ride = await Ride.findById(id);
