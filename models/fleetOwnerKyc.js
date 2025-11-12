@@ -23,3 +23,4 @@ const fleetOwnerKycSchema = new mongoose.Schema(
 
 module.exports = mongoose.model("FleetOwnerKyc", fleetOwnerKycSchema);
 
+

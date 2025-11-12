@@ -1,63 +1,55 @@
-// routes/carRoutes.js
 const express = require("express");
 const router = express.Router();
 const carController = require("../controllers/car");
-const { auth, requireFleetOwner, requireAdmin } = require("../middlewares/auth");
-const { ensureApprovedKyc } = require("../middlewares/kyc");
-const multer = require("multer");
+const { auth, requireAdmin } = require("../middlewares/auth");
+const upload = require("../middlewares/upload");
 
-// Multer setup for memory storage (needed for Cloudinary upload)
-const storage = multer.memoryStorage();
-const upload = multer({ storage });
+// Public/Protected: Get all cars (approved and available for non-admin, all for admin)
+router.get("/", auth, carController.getCars);
 
-// ----------------------
-// Public routes
-// ----------------------
-router.get("/", auth, carController.getCars); // get all cars
-router.get("/:id", auth, carController.getCarById); // get single car
+// Public/Protected: Get single car by ID
+router.get("/:id", auth, carController.getCarById);
 
-// ----------------------
-// Protected routes (FleetOwner only can add/update/delete)
-// ----------------------
-
-// Add car (multiple images + 1 video)
+// Protected: Add car (FleetOwner and Admin only, not Rider)
 router.post(
     "/",
     auth,
-    requireFleetOwner,
-    ensureApprovedKyc,
     upload.fields([
-        { name: "carImages", maxCount: 10 },
+        { name: "carImage", maxCount: 10 }, // min 5, max 10
         { name: "video", maxCount: 1 },
-        { name: "insurancePhoto", maxCount: 1 },
-        { name: "pollutionCertificate", maxCount: 1 },
-        { name: "taxToken", maxCount: 1 },
+        { name: "insurance", maxCount: 1 },
+        { name: "pollution", maxCount: 1 },
+        { name: "tacToken", maxCount: 1 },
         { name: "rcBook", maxCount: 1 },
     ]),
     carController.addCar
 );
 
-// Update car (same uploads as add)
+// Protected: Update car (FleetOwner and Admin only)
 router.put(
     "/:id",
     auth,
-    requireFleetOwner,
-    ensureApprovedKyc,
     upload.fields([
-        { name: "carImages", maxCount: 10 },
+        { name: "carImage", maxCount: 10 },
         { name: "video", maxCount: 1 },
-        { name: "insurancePhoto", maxCount: 1 },
-        { name: "pollutionCertificate", maxCount: 1 },
-        { name: "taxToken", maxCount: 1 },
+        { name: "insurance", maxCount: 1 },
+        { name: "pollution", maxCount: 1 },
+        { name: "tacToken", maxCount: 1 },
         { name: "rcBook", maxCount: 1 },
     ]),
     carController.updateCar
 );
 
-// Delete car
-router.delete("/:id", auth, requireFleetOwner, carController.deleteCar);
+// Protected: Delete car (FleetOwner and Admin only)
+router.delete("/:id", auth, carController.deleteCar);
 
-// Approve car (admin only)
+// Admin only: Approve car
 router.put("/:id/approve", auth, requireAdmin, carController.approveCar);
+
+// Admin only: Reject car
+router.put("/:id/reject", auth, requireAdmin, carController.rejectCar);
+
+// Admin only: Update car status
+router.put("/:id/status", auth, requireAdmin, carController.updateCarStatus);
 
 module.exports = router;

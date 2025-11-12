@@ -17,3 +17,4 @@ const riderKycSchema = new mongoose.Schema(
 
 module.exports = mongoose.model("RiderKyc", riderKycSchema);
 
+

@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/user");
+const Admin = require("../models/admin");
 
 const auth = async (req, res, next) => {
     try {
@@ -11,11 +12,16 @@ const auth = async (req, res, next) => {
         const token = authHeader.split(" ")[1];
         const decoded = jwt.verify(token, process.env.JWT_SECRET || "dev_secret");
 
-        // Verify user exists
-        const user = await User.findById(decoded.id);
-        if (!user) return res.status(401).json({ success: false, message: "Unauthorized: User not found" });
-
-        req.user = user
+        // Check if it's an admin or regular user based on role in token
+        if (decoded.role === "admin" || decoded.role === "Admin") {
+            const admin = await Admin.findById(decoded.id);
+            if (!admin) return res.status(401).json({ success: false, message: "Unauthorized: Admin not found" });
+            req.user = { ...admin.toObject(), id: admin._id, role: admin.role || "admin" };
+        } else {
+            const user = await User.findById(decoded.id);
+            if (!user) return res.status(401).json({ success: false, message: "Unauthorized: User not found" });
+            req.user = { ...user.toObject(), id: user._id, role: user.role };
+        }
 
         next();
     } catch (error) {

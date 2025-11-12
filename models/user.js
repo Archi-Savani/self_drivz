@@ -13,7 +13,7 @@ const userSchema = new mongoose.Schema(
         email: {
             type: String,
             unique: true,
-            sparse: true, // Only enforce uniqueness for non-null values
+            sparse: true, // Allows multiple null values, but enforces uniqueness for non-null values
             lowercase: true,
             trim: true,
         },
@@ -28,7 +28,7 @@ const userSchema = new mongoose.Schema(
         },
         role: {
             type: String,
-            enum: ["Admin", "Rider", "FleetOwner"], // only these values allowed
+            enum: ["Rider", "FleetOwner"], // only these values allowed
             default: "Rider", // default role
         },
     },

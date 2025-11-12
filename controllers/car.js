@@ -1,83 +1,101 @@
-// controllers/carController.js
 const Car = require("../models/car");
-const { uploadMultipleFiles } = require("../utils/uploadMultipleFiles"); // cloudinary util
+const { uploadFile, uploadMultipleFiles } = require("../utils/cloudinary");
 
-// Add Car - Only FleetOwner (role != Rider)
+// Add Car - Only FleetOwner and Admin (not Rider)
 const addCar = async (req, res) => {
     try {
-        if (req.user.role === "Rider") {
-            return res.status(403).json({ success: false, message: "Only FleetOwner can add cars" });
+        const role = (req.user?.role || "").toString().trim().toLowerCase();
+        if (role === "rider") {
+            return res.status(403).json({ success: false, message: "Riders cannot add cars. Only FleetOwner and Admin can add cars." });
         }
 
-        const { name, category, seating, hourlyRate, kmPerHour, transmission, fuel, features } = req.body;
+        const {
+            carName,
+            brand,
+            model,
+            year,
+            color,
+            RegNo,
+            transmission,
+            fuelType,
+            seating,
+            pricePerDay,
+            UnitsAvailable,
+            dec,
+            variant,
+            features,
+        } = req.body;
 
-        if (!name || !category || !seating || !hourlyRate || !kmPerHour || !transmission || !fuel) {
-            return res.status(400).json({ success: false, message: "All required fields are required" });
+        // Validate required fields
+        if (!carName || !brand || !model || !year || !color || !RegNo || !transmission || !fuelType || !seating || !pricePerDay) {
+            return res.status(400).json({ success: false, message: "carName, brand, model, year, color, RegNo, transmission, fuelType, seating, pricePerDay are required" });
         }
 
-        // Upload multiple car images
-        let carImages = [];
-        if (req.files && req.files.carImages) {
-            const fileBuffers = req.files.carImages.map(f => f.buffer);
-            carImages = await uploadMultipleFiles(fileBuffers);
+        // Validate car images (min 5, max 10)
+        if (!req.files || !req.files.carImage || req.files.carImage.length < 5 || req.files.carImage.length > 10) {
+            return res.status(400).json({ success: false, message: "carImage must have between 5 and 10 images" });
         }
 
-        // Upload video
-        let videoUrl = "";
-        if (req.files && req.files.video && req.files.video[0]) {
-            const fileBuffer = req.files.video[0].buffer;
-            const [uploadedVideo] = await uploadMultipleFiles([fileBuffer]);
-            videoUrl = uploadedVideo;
+        // Validate required document images
+        if (!req.files.insurance || !req.files.insurance[0]) {
+            return res.status(400).json({ success: false, message: "insurance image is required" });
+        }
+        if (!req.files.pollution || !req.files.pollution[0]) {
+            return res.status(400).json({ success: false, message: "pollution image is required" });
+        }
+        if (!req.files.tacToken || !req.files.tacToken[0]) {
+            return res.status(400).json({ success: false, message: "tacToken image is required" });
+        }
+        if (!req.files.rcBook || !req.files.rcBook[0]) {
+            return res.status(400).json({ success: false, message: "rcBook image is required" });
         }
 
-        // Upload single document images
-        let insurancePhoto = "";
-        if (req.files && req.files.insurancePhoto && req.files.insurancePhoto[0]) {
-            const [uploaded] = await uploadMultipleFiles([req.files.insurancePhoto[0].buffer]);
-            insurancePhoto = uploaded;
+        // Upload car images (5-10)
+        const carImageBuffers = req.files.carImage.map(f => f.buffer);
+        const carImages = await uploadMultipleFiles(carImageBuffers);
+
+        // Upload video (optional)
+        let videoUrl = null;
+        if (req.files.video && req.files.video[0]) {
+            videoUrl = await uploadFile(req.files.video[0].buffer, "video");
         }
 
-        let pollutionCertificate = "";
-        if (req.files && req.files.pollutionCertificate && req.files.pollutionCertificate[0]) {
-            const [uploaded] = await uploadMultipleFiles([req.files.pollutionCertificate[0].buffer]);
-            pollutionCertificate = uploaded;
-        }
-
-        let taxToken = "";
-        if (req.files && req.files.taxToken && req.files.taxToken[0]) {
-            const [uploaded] = await uploadMultipleFiles([req.files.taxToken[0].buffer]);
-            taxToken = uploaded;
-        }
-
-        let rcBook = "";
-        if (req.files && req.files.rcBook && req.files.rcBook[0]) {
-            const [uploaded] = await uploadMultipleFiles([req.files.rcBook[0].buffer]);
-            rcBook = uploaded;
-        }
+        // Upload document images
+        const insuranceUrl = await uploadFile(req.files.insurance[0].buffer);
+        const pollutionUrl = await uploadFile(req.files.pollution[0].buffer);
+        const tacTokenUrl = await uploadFile(req.files.tacToken[0].buffer);
+        const rcBookUrl = await uploadFile(req.files.rcBook[0].buffer);
 
         const newCar = new Car({
-            name,
-            category,
-            seating,
-            hourlyRate,
-            kmPerHour,
-            transmission,
-            fuel,
-            features: features ? features.split(",").map(f => f.trim()) : [],
-            carImages,
+            carName,
+            brand,
+            model,
+            year: parseInt(year),
+            color,
+            RegNo: RegNo.toUpperCase(),
+            transmission: transmission.toLowerCase(),
+            fuelType,
+            seating: parseInt(seating),
+            pricePerDay: parseFloat(pricePerDay),
+            UnitsAvailable: UnitsAvailable ? parseInt(UnitsAvailable) : 1,
+            carstatus: "unavailable", // Will be available only after admin approval
+            dec,
+            variant: variant || "",
+            features: Array.isArray(features) ? features : (features ? [features] : []),
+            carImage: carImages,
             video: videoUrl,
-            insurancePhoto,
-            pollutionCertificate,
-            taxToken,
-            rcBook,
-            status: "Pending",
+            insurance: insuranceUrl,
+            pollution: pollutionUrl,
+            tacToken: tacTokenUrl,
+            rcBook: rcBookUrl,
+            status: "pending", // Always pending when submitted
         });
 
         await newCar.save();
 
         res.status(201).json({
             success: true,
-            message: "Car added successfully and pending approval",
+            message: "Car added successfully. Waiting for admin approval.",
             data: newCar,
         });
     } catch (error) {
@@ -85,10 +103,18 @@ const addCar = async (req, res) => {
     }
 };
 
-// Get all cars
+// Get all cars (only approved and available cars for public, all for admin)
 const getCars = async (req, res) => {
     try {
-        const cars = await Car.find();
+        const role = (req.user?.role || "").toString().trim().toLowerCase();
+        let query = {};
+        
+        // Non-admin users only see approved and available cars
+        if (role !== "admin") {
+            query = { status: "approved", carstatus: "available" };
+        }
+
+        const cars = await Car.find(query).sort({ createdAt: -1 });
         res.status(200).json({ success: true, data: cars });
     } catch (error) {
         res.status(500).json({ success: false, message: "Failed to fetch cars", error: error.message });
@@ -100,59 +126,96 @@ const getCarById = async (req, res) => {
     try {
         const car = await Car.findById(req.params.id);
         if (!car) return res.status(404).json({ success: false, message: "Car not found" });
+        
+        const role = (req.user?.role || "").toString().trim().toLowerCase();
+        // Non-admin users can see pending cars if they own them, but for now show all
         res.status(200).json({ success: true, data: car });
     } catch (error) {
         res.status(500).json({ success: false, message: "Failed to fetch car", error: error.message });
     }
 };
 
-// Update car - Only FleetOwner, cannot edit status
+// Update car - Only FleetOwner and Admin (not Rider)
 const updateCar = async (req, res) => {
     try {
-        if (req.user.role === "Rider") {
-            return res.status(403).json({ success: false, message: "Only FleetOwner can update cars" });
+        const role = (req.user?.role || "").toString().trim().toLowerCase();
+        if (role === "rider") {
+            return res.status(403).json({ success: false, message: "Riders cannot update cars" });
         }
 
-        const { category, seating, hourlyRate, kmPerHour, transmission, fuel, features } = req.body;
-        const updatedData = { category, seating, hourlyRate, kmPerHour, transmission, fuel };
+        const {
+            carName,
+            brand,
+            model,
+            year,
+            color,
+            RegNo,
+            transmission,
+            fuelType,
+            seating,
+            pricePerDay,
+            UnitsAvailable,
+            carstatus,
+            dec,
+            variant,
+            features,
+        } = req.body;
 
-        if (features) updatedData.features = features.split(",").map(f => f.trim());
+        const updateData = {};
+        if (carName !== undefined) updateData.carName = carName;
+        if (brand !== undefined) updateData.brand = brand;
+        if (model !== undefined) updateData.model = model;
+        if (year !== undefined) updateData.year = parseInt(year);
+        if (color !== undefined) updateData.color = color;
+        if (RegNo !== undefined) updateData.RegNo = RegNo.toUpperCase();
+        if (transmission !== undefined) updateData.transmission = transmission.toLowerCase();
+        if (fuelType !== undefined) updateData.fuelType = fuelType;
+        if (seating !== undefined) updateData.seating = parseInt(seating);
+        if (pricePerDay !== undefined) updateData.pricePerDay = parseFloat(pricePerDay);
+        if (UnitsAvailable !== undefined) updateData.UnitsAvailable = parseInt(UnitsAvailable);
+        if (dec !== undefined) updateData.dec = dec;
+        if (variant !== undefined) updateData.variant = variant;
+        if (features !== undefined) updateData.features = Array.isArray(features) ? features : (features ? [features] : []);
 
-        // Upload new images if provided
-        if (req.files && req.files.carImages) {
-            const fileBuffers = req.files.carImages.map(f => f.buffer);
-            updatedData.carImages = await uploadMultipleFiles(fileBuffers);
+        // Only admin can update carstatus
+        if (role === "admin" && carstatus !== undefined) {
+            updateData.carstatus = carstatus.toLowerCase();
+        }
+
+        // Upload new car images if provided (must be 5-10)
+        if (req.files && req.files.carImage) {
+            if (req.files.carImage.length < 5 || req.files.carImage.length > 10) {
+                return res.status(400).json({ success: false, message: "carImage must have between 5 and 10 images" });
+            }
+            const carImageBuffers = req.files.carImage.map(f => f.buffer);
+            updateData.carImage = await uploadMultipleFiles(carImageBuffers);
         }
 
         // Upload new video if provided
         if (req.files && req.files.video && req.files.video[0]) {
-            const fileBuffer = req.files.video[0].buffer;
-            const [uploadedVideo] = await uploadMultipleFiles([fileBuffer]);
-            updatedData.video = uploadedVideo;
+            updateData.video = await uploadFile(req.files.video[0].buffer, "video");
         }
 
-        // Upload new single docs if provided
-        if (req.files && req.files.insurancePhoto && req.files.insurancePhoto[0]) {
-            const [uploaded] = await uploadMultipleFiles([req.files.insurancePhoto[0].buffer]);
-            updatedData.insurancePhoto = uploaded;
+        // Upload new document images if provided
+        if (req.files && req.files.insurance && req.files.insurance[0]) {
+            updateData.insurance = await uploadFile(req.files.insurance[0].buffer);
         }
-
-        if (req.files && req.files.pollutionCertificate && req.files.pollutionCertificate[0]) {
-            const [uploaded] = await uploadMultipleFiles([req.files.pollutionCertificate[0].buffer]);
-            updatedData.pollutionCertificate = uploaded;
+        if (req.files && req.files.pollution && req.files.pollution[0]) {
+            updateData.pollution = await uploadFile(req.files.pollution[0].buffer);
         }
-
-        if (req.files && req.files.taxToken && req.files.taxToken[0]) {
-            const [uploaded] = await uploadMultipleFiles([req.files.taxToken[0].buffer]);
-            updatedData.taxToken = uploaded;
+        if (req.files && req.files.tacToken && req.files.tacToken[0]) {
+            updateData.tacToken = await uploadFile(req.files.tacToken[0].buffer);
         }
-
         if (req.files && req.files.rcBook && req.files.rcBook[0]) {
-            const [uploaded] = await uploadMultipleFiles([req.files.rcBook[0].buffer]);
-            updatedData.rcBook = uploaded;
+            updateData.rcBook = await uploadFile(req.files.rcBook[0].buffer);
         }
 
-        const car = await Car.findByIdAndUpdate(req.params.id, updatedData, { new: true });
+        // Non-admin cannot change status
+        if (role !== "admin" && updateData.status) {
+            delete updateData.status;
+        }
+
+        const car = await Car.findByIdAndUpdate(req.params.id, updateData, { new: true });
         if (!car) return res.status(404).json({ success: false, message: "Car not found" });
 
         res.status(200).json({ success: true, message: "Car updated successfully", data: car });
@@ -161,11 +224,12 @@ const updateCar = async (req, res) => {
     }
 };
 
-// Delete car - FleetOwner only
+// Delete car - FleetOwner and Admin only
 const deleteCar = async (req, res) => {
     try {
-        if (req.user.role === "Rider") {
-            return res.status(403).json({ success: false, message: "Only FleetOwner can delete cars" });
+        const role = (req.user?.role || "").toString().trim().toLowerCase();
+        if (role === "rider") {
+            return res.status(403).json({ success: false, message: "Riders cannot delete cars" });
         }
 
         const car = await Car.findByIdAndDelete(req.params.id);
@@ -177,19 +241,76 @@ const deleteCar = async (req, res) => {
     }
 };
 
-// Approve car - Admin only
+// Approve car - Admin only (sets status to approved and carstatus to available)
 const approveCar = async (req, res) => {
     try {
-        if (req.user.role !== "admin") {
+        const role = (req.user?.role || "").toString().trim().toLowerCase();
+        if (role !== "admin") {
             return res.status(403).json({ success: false, message: "Only admin can approve cars" });
         }
 
-        const car = await Car.findByIdAndUpdate(req.params.id, { status: "Approved" }, { new: true });
+        const car = await Car.findByIdAndUpdate(
+            req.params.id,
+            { status: "approved", carstatus: "available" },
+            { new: true }
+        );
         if (!car) return res.status(404).json({ success: false, message: "Car not found" });
 
-        res.status(200).json({ success: true, message: "Car approved successfully", data: car });
+        res.status(200).json({ success: true, message: "Car approved successfully. Car is now available.", data: car });
     } catch (error) {
         res.status(500).json({ success: false, message: "Failed to approve car", error: error.message });
+    }
+};
+
+// Reject car - Admin only
+const rejectCar = async (req, res) => {
+    try {
+        const role = (req.user?.role || "").toString().trim().toLowerCase();
+        if (role !== "admin") {
+            return res.status(403).json({ success: false, message: "Only admin can reject cars" });
+        }
+
+        const car = await Car.findByIdAndUpdate(
+            req.params.id,
+            { status: "rejected", carstatus: "unavailable" },
+            { new: true }
+        );
+        if (!car) return res.status(404).json({ success: false, message: "Car not found" });
+
+        res.status(200).json({ success: true, message: "Car rejected successfully", data: car });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Failed to reject car", error: error.message });
+    }
+};
+
+// Update car status - Admin only
+const updateCarStatus = async (req, res) => {
+    try {
+        const role = (req.user?.role || "").toString().trim().toLowerCase();
+        if (role !== "admin") {
+            return res.status(403).json({ success: false, message: "Only admin can update car status" });
+        }
+
+        const { status } = req.body;
+        if (!status || !["pending", "approved", "rejected"].includes(status.toLowerCase())) {
+            return res.status(400).json({ success: false, message: "Invalid status. Must be pending, approved, or rejected" });
+        }
+
+        const updateData = { status: status.toLowerCase() };
+        
+        // If approving, set carstatus to available
+        if (status.toLowerCase() === "approved") {
+            updateData.carstatus = "available";
+        } else if (status.toLowerCase() === "rejected") {
+            updateData.carstatus = "unavailable";
+        }
+
+        const car = await Car.findByIdAndUpdate(req.params.id, updateData, { new: true });
+        if (!car) return res.status(404).json({ success: false, message: "Car not found" });
+
+        res.status(200).json({ success: true, message: "Car status updated successfully", data: car });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Failed to update car status", error: error.message });
     }
 };
 
@@ -200,4 +321,6 @@ module.exports = {
     updateCar,
     deleteCar,
     approveCar,
+    rejectCar,
+    updateCarStatus,
 };

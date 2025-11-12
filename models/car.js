@@ -1,86 +1,122 @@
-// models/Car.js
 const mongoose = require("mongoose");
 
 const carSchema = new mongoose.Schema(
     {
-        name: {
+        carName: {
             type: String,
             required: true,
             trim: true,
         },
-        category: {
+        brand: {
             type: String,
             required: true,
             trim: true,
-            enum: ["Sedan", "SUV", "Hatchback", "Luxury", "Van", "Other"],
         },
-        seating: {
+        model: {
             type: String,
             required: true,
-            enum: ["5 Seater", "7 Seater", "8 Seater"], // Seating options
+            trim: true,
         },
-        hourlyRate: {
+        year: {
             type: Number,
             required: true,
-            min: 0,
         },
-        kmPerHour: {
-            type: Number,
+        color: {
+            type: String,
             required: true,
-            min: 0,
+            trim: true,
+        },
+        RegNo: {
+            type: String,
+            required: true,
+            unique: true,
+            trim: true,
+            uppercase: true,
         },
         transmission: {
             type: String,
             required: true,
-            enum: ["Auto", "Manual"],
+            enum: ["auto", "manual"],
+            lowercase: true,
         },
-        fuel: {
+        fuelType: {
             type: String,
             required: true,
-            enum: ["Electric", "Petrol", "Diesel", "CNG"],
+            trim: true,
         },
-        carImages: {
-            type: [String], // array of image URLs
-            validate: [arrayLimit, "{PATH} exceeds the limit of 10"],
+        seating: {
+            type: Number,
+            required: true,
+            min: 1,
+        },
+        pricePerDay: {
+            type: Number,
+            required: true,
+            min: 0,
+        },
+        UnitsAvailable: {
+            type: Number,
+            required: true,
+            min: 0,
+            default: 1,
+        },
+        carstatus: {
+            type: String,
+            enum: ["available", "unavailable", "maintenance"],
+            default: "unavailable",
+            lowercase: true,
+        },
+        dec: {
+            type: String,
+            trim: true,
+        },
+        variant: {
+            type: String,
+            trim: true,
+        },
+        features: {
+            type: [String], // array of feature strings
             default: [],
         },
+        carImage: {
+            type: [String], // array of Cloudinary image URLs
+            required: true,
+            validate: [
+                {
+                    validator: function(value) {
+                        return Array.isArray(value) && value.length >= 5 && value.length <= 10;
+                    },
+                    message: "carImage must have between 5 and 10 images",
+                },
+            ],
+        },
         video: {
-            type: String, // video URL or path
+            type: String, // Cloudinary video URL
         },
-        insurancePhoto: {
-            type: String, // single image URL
+        insurance: {
+            type: String, // Cloudinary image URL
             required: true,
         },
-        pollutionCertificate: {
-            type: String, // single image URL
+        pollution: {
+            type: String, // Cloudinary image URL
             required: true,
         },
-        taxToken: {
-            type: String, // single image URL
+        tacToken: {
+            type: String, // Cloudinary image URL
             required: true,
         },
         rcBook: {
-            type: String, // single image URL
+            type: String, // Cloudinary image URL
             required: true,
         },
         status: {
             type: String,
-            enum: ["Pending", "Approved"],
-            default: "Pending",
-        },
-        features: {
-            type: [String], // array of car features
-            default: [],
+            enum: ["pending", "approved", "rejected"],
+            default: "pending",
+            lowercase: true,
         },
     },
-    {
-        timestamps: true,
-    }
+    { timestamps: true }
 );
-
-// Validator for max 10 images
-function arrayLimit(val) {
-    return val.length <= 10;
-}
 
 module.exports = mongoose.model("Car", carSchema);

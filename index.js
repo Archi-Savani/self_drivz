@@ -5,6 +5,7 @@ const dotenv = require("dotenv");
 
 const userRoutes = require("./routes/user");
 const carRoutes = require("./routes/car");
+const adminRoutes = require("./routes/admin");
 const adminOfferRoutes = require("./routes/adminOffer");
 const adminBannerRoutes = require("./routes/adminBanner");
 const riderKycRoutes = require("./routes/riderKyc");
@@ -24,6 +25,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use("/api/user", userRoutes);
+app.use("/api/admin", adminRoutes);
 app.use("/api/car", carRoutes);
 app.use("/api/adminOffer", adminOfferRoutes);
 app.use("/api/adminBanner", adminBannerRoutes);
