@@ -3,7 +3,7 @@ const router = express.Router();
 const { auth } = require("../middlewares/auth");
 const controller = require("../controllers/ratingReview");
 
-// Create or upsert a rating (rider <-> fleetowner)
+// Create or upsert a rating
 router.post("/", auth, controller.createRating);
 
 // List ratings for a specific carId, with average
