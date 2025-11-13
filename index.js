@@ -15,6 +15,7 @@ const termsRoutes = require("./routes/terms");
 const rideRoutes = require("./routes/ride");
 const adventureRoutes = require("./routes/adventure");
 const ratingReviewRoutes = require("./routes/ratingReview");
+const carListRoutes = require("./routes/carList");
 
 dotenv.config();
 
@@ -38,6 +39,7 @@ app.use("/api/terms", termsRoutes);
 app.use("/api/ride", rideRoutes);
 app.use("/api/adventures", adventureRoutes);
 app.use("/api/rating-review", ratingReviewRoutes);
+app.use("/api/car-list", carListRoutes);
 
 const connectDB = async () => {
     try {

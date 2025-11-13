@@ -1,4 +1,6 @@
 const Car = require("../models/car");
+const mongoose = require("mongoose");
+const User = require("../models/user");
 const { uploadFile, uploadMultipleFiles } = require("../utils/cloudinary");
 
 // Add Car - Only FleetOwner and Admin (not Rider)
@@ -24,6 +26,7 @@ const addCar = async (req, res) => {
             dec,
             variant,
             features,
+            fleetBy, // only honored when admin adds
         } = req.body;
 
         // Validate required fields
@@ -91,6 +94,21 @@ const addCar = async (req, res) => {
             status: "pending", // Always pending when submitted
         });
 
+        // Only admin can set fleetBy; ignore for fleet owners
+        if (role === "admin" && typeof fleetBy !== "undefined" && fleetBy !== null && fleetBy !== "") {
+            if (!mongoose.Types.ObjectId.isValid(fleetBy)) {
+                return res.status(400).json({ success: false, message: "fleetBy must be a valid user id" });
+            }
+            const ownerUser = await User.findById(fleetBy);
+            if (!ownerUser) {
+                return res.status(404).json({ success: false, message: "Specified fleet owner not found" });
+            }
+            if (ownerUser.role !== "FleetOwner") {
+                return res.status(400).json({ success: false, message: "fleetBy must reference a FleetOwner user" });
+            }
+            newCar.fleetBy = ownerUser._id;
+        }
+
         await newCar.save();
 
         res.status(201).json({
@@ -108,13 +126,17 @@ const getCars = async (req, res) => {
     try {
         const role = (req.user?.role || "").toString().trim().toLowerCase();
         let query = {};
-        
+
         // Non-admin users only see approved and available cars
         if (role !== "admin") {
             query = { status: "approved", carstatus: "available" };
         }
 
-        const cars = await Car.find(query).sort({ createdAt: -1 });
+        let queryBuilder = Car.find(query).sort({ createdAt: -1 });
+        if (role !== "admin") {
+            queryBuilder = queryBuilder.select("-fleetBy");
+        }
+        const cars = await queryBuilder;
         res.status(200).json({ success: true, data: cars });
     } catch (error) {
         res.status(500).json({ success: false, message: "Failed to fetch cars", error: error.message });
@@ -124,10 +146,14 @@ const getCars = async (req, res) => {
 // Get single car by ID
 const getCarById = async (req, res) => {
     try {
-        const car = await Car.findById(req.params.id);
-        if (!car) return res.status(404).json({ success: false, message: "Car not found" });
-        
+        let queryBuilder = Car.findById(req.params.id);
         const role = (req.user?.role || "").toString().trim().toLowerCase();
+        if (role !== "admin") {
+            queryBuilder = queryBuilder.select("-fleetBy");
+        }
+        const car = await queryBuilder;
+        if (!car) return res.status(404).json({ success: false, message: "Car not found" });
+
         // Non-admin users can see pending cars if they own them, but for now show all
         res.status(200).json({ success: true, data: car });
     } catch (error) {
@@ -159,6 +185,7 @@ const updateCar = async (req, res) => {
             dec,
             variant,
             features,
+            fleetBy,
         } = req.body;
 
         const updateData = {};
@@ -180,6 +207,25 @@ const updateCar = async (req, res) => {
         // Only admin can update carstatus
         if (role === "admin" && carstatus !== undefined) {
             updateData.carstatus = carstatus.toLowerCase();
+        }
+
+        // Only admin can modify fleetBy
+        if (role === "admin" && fleetBy !== undefined) {
+            if (fleetBy === null || fleetBy === "") {
+                updateData.fleetBy = undefined;
+            } else {
+                if (!mongoose.Types.ObjectId.isValid(fleetBy)) {
+                    return res.status(400).json({ success: false, message: "fleetBy must be a valid user id" });
+                }
+                const ownerUser = await User.findById(fleetBy);
+                if (!ownerUser) {
+                    return res.status(404).json({ success: false, message: "Specified fleet owner not found" });
+                }
+                if (ownerUser.role !== "FleetOwner") {
+                    return res.status(400).json({ success: false, message: "fleetBy must reference a FleetOwner user" });
+                }
+                updateData.fleetBy = ownerUser._id;
+            }
         }
 
         // Upload new car images if provided (must be 5-10)
@@ -215,7 +261,11 @@ const updateCar = async (req, res) => {
             delete updateData.status;
         }
 
-        const car = await Car.findByIdAndUpdate(req.params.id, updateData, { new: true });
+        let updatedCarQuery = Car.findByIdAndUpdate(req.params.id, updateData, { new: true });
+        if (role !== "admin") {
+            updatedCarQuery = updatedCarQuery.select("-fleetBy");
+        }
+        const car = await updatedCarQuery;
         if (!car) return res.status(404).json({ success: false, message: "Car not found" });
 
         res.status(200).json({ success: true, message: "Car updated successfully", data: car });

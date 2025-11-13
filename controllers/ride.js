@@ -1,4 +1,6 @@
+const mongoose = require("mongoose");
 const Ride = require("../models/ride");
+const Car = require("../models/car");
 
 function validateRanges(date, time) {
     if (!date || !time) return "date and time are required";
@@ -51,7 +53,18 @@ function validateLocation(location) {
 
 exports.createRide = async (req, res) => {
     try {
-        const { location, date, time } = req.body;
+        const { location, date, time, carId } = req.body;
+
+        if (!carId) {
+            return res.status(400).json({ success: false, message: "carId is required" });
+        }
+        if (!mongoose.Types.ObjectId.isValid(carId)) {
+            return res.status(400).json({ success: false, message: "carId must be a valid id" });
+        }
+        const car = await Car.findById(carId);
+        if (!car) {
+            return res.status(404).json({ success: false, message: "Car not found" });
+        }
 
         const rangeError = validateRanges(date, time);
         if (rangeError) return res.status(400).json({ success: false, message: rangeError });
@@ -59,9 +72,9 @@ exports.createRide = async (req, res) => {
         const locationError = validateLocation(location);
         if (locationError) return res.status(400).json({ success: false, message: locationError });
 
-        const ride = await Ride.create({ location, date, time, status: "pending" });
+        const ride = await Ride.create({ carId, location, date, time, status: "pending" });
 
-        res.status(201).json({ success: true, data: ride });
+        res.status(201).json({ success: true, data: await ride.populate("carId") });
     } catch (error) {
         res.status(500).json({ success: false, message: "Failed to create ride", error: error.message });
     }
@@ -69,10 +82,16 @@ exports.createRide = async (req, res) => {
 
 exports.getRides = async (req, res) => {
     try {
-        const { riderId, status, dateFrom, dateTo, page = 1, pageSize = 20 } = req.query;
+        const { riderId, status, dateFrom, dateTo, page = 1, pageSize = 20, carId } = req.query;
         const filter = {};
         if (riderId) filter.riderId = riderId;
         if (status) filter.status = status;
+        if (carId) {
+            if (!mongoose.Types.ObjectId.isValid(carId)) {
+                return res.status(400).json({ success: false, message: "carId must be a valid id" });
+            }
+            filter.carId = carId;
+        }
         if (dateFrom || dateTo) {
             filter["date.from"] = dateFrom ? { $gte: dateFrom } : undefined;
             filter["date.to"] = dateTo ? { $lte: dateTo } : undefined;
@@ -83,7 +102,7 @@ exports.getRides = async (req, res) => {
 
         const skip = (Number(page) - 1) * Number(pageSize);
         const [items, total] = await Promise.all([
-            Ride.find(filter).sort({ createdAt: -1 }).skip(skip).limit(Number(pageSize)),
+            Ride.find(filter).sort({ createdAt: -1 }).skip(skip).limit(Number(pageSize)).populate("carId"),
             Ride.countDocuments(filter),
         ]);
 
@@ -95,7 +114,7 @@ exports.getRides = async (req, res) => {
 
 exports.getRideById = async (req, res) => {
     try {
-        const ride = await Ride.findById(req.params.id);
+        const ride = await Ride.findById(req.params.id).populate("carId");
         if (!ride) return res.status(404).json({ success: false, message: "Ride not found" });
         res.json({ success: true, data: ride });
     } catch (error) {
@@ -106,7 +125,7 @@ exports.getRideById = async (req, res) => {
 exports.updateRide = async (req, res) => {
     try {
         const { id } = req.params;
-        const { location, date, time } = req.body;
+        const { location, date, time, carId } = req.body;
 
         if (location) {
             const e = validateLocation(location);
@@ -140,10 +159,21 @@ exports.updateRide = async (req, res) => {
 
         // Prevent status changes here
         const update = { location, date, time };
+        if (carId !== undefined) {
+            if (!mongoose.Types.ObjectId.isValid(carId)) {
+                return res.status(400).json({ success: false, message: "carId must be a valid id" });
+            }
+            const car = await Car.findById(carId);
+            if (!car) {
+                return res.status(404).json({ success: false, message: "Car not found" });
+            }
+            update.carId = carId;
+        }
         Object.keys(update).forEach((k) => update[k] === undefined && delete update[k]);
 
         Object.assign(ride, update);
         await ride.save();
+        await ride.populate("carId");
         res.json({ success: true, data: ride });
     } catch (error) {
         res.status(500).json({ success: false, message: "Failed to update ride", error: error.message });
@@ -160,7 +190,7 @@ exports.updateRideStatus = async (req, res) => {
             req.params.id,
             { status },
             { new: true }
-        );
+        ).populate("carId");
         if (!ride) return res.status(404).json({ success: false, message: "Ride not found" });
         res.json({ success: true, data: ride });
     } catch (error) {

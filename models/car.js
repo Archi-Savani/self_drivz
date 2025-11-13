@@ -109,6 +109,11 @@ const carSchema = new mongoose.Schema(
             type: String, // Cloudinary image URL
             required: true,
         },
+        fleetBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: false,
+        },
         status: {
             type: String,
             enum: ["pending", "approved", "rejected"],

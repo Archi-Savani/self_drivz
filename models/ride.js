@@ -34,6 +34,11 @@ const TimeRangeSchema = new mongoose.Schema(
 
 const RideSchema = new mongoose.Schema(
     {
+        carId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Car",
+            required: true,
+        },
         location: { type: LocationSchema, required: true },
         date: { type: DateRangeSchema, required: true },
         time: { type: TimeRangeSchema, required: true },
