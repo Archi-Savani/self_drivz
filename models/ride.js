@@ -42,7 +42,7 @@ const RideSchema = new mongoose.Schema(
         location: { type: LocationSchema, required: true },
         date: { type: DateRangeSchema, required: true },
         time: { type: TimeRangeSchema, required: true },
-        status: { type: String, enum: ["pending", "approve", "reject"], default: "pending" },
+        status: { type: String, enum: ["pending", "approve", "reject", "ongoing"], default: "pending", lowercase: true },
     },
     { timestamps: true }
 );

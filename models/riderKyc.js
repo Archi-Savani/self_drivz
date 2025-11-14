@@ -10,7 +10,7 @@ const riderKycSchema = new mongoose.Schema(
         aadharBack: { type: String, required: true }, // Cloudinary URL
         drivingLicenseFront: { type: String, required: true }, // Cloudinary URL
         drivingLicenseBack: { type: String, required: true }, // Cloudinary URL
-        status: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
+        status: { type: String, enum: ["pending", "approved", "rejected", "block"], default: "pending", lowercase: true },
     },
     { timestamps: true }
 );

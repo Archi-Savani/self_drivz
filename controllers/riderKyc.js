@@ -124,12 +124,12 @@ const updateRiderKycStatus = async (req, res) => {
         const { id } = req.params;
         const { status } = req.body;
 
-        if (!status || !["pending", "approved", "rejected"].includes(status)) {
-            return res.status(400).json({ success: false, message: "Invalid status. Must be pending, approved, or rejected" });
+        if (!status || !["pending", "approved", "rejected", "block"].includes(status.toLowerCase())) {
+            return res.status(400).json({ success: false, message: "Invalid status. Must be pending, approved, rejected, or block" });
         }
 
         const update = {
-            status,
+            status: status.toLowerCase(),
         };
 
         const riderKyc = await RiderKyc.findByIdAndUpdate(id, update, { new: true });
@@ -248,8 +248,8 @@ const updateRiderKyc = async (req, res) => {
 
         if (isAdmin) {
             // Admins can update any fields; keep status as provided or unchanged
-            if (req.body.status && ["pending", "approved", "rejected"].includes(req.body.status)) {
-                updateData.status = req.body.status;
+            if (req.body.status && ["pending", "approved", "rejected", "block"].includes(req.body.status.toLowerCase())) {
+                updateData.status = req.body.status.toLowerCase();
             }
         } else {
             if (isApproved) {

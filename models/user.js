@@ -31,6 +31,12 @@ const userSchema = new mongoose.Schema(
             enum: ["Rider", "FleetOwner"], // only these values allowed
             default: "Rider", // default role
         },
+        status: {
+            type: String,
+            enum: ["pending", "approved", "rejected", "blocked"],
+            default: "pending",
+            lowercase: true,
+        },
     },
     { timestamps: true }
 );

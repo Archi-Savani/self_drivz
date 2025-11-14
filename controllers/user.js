@@ -8,7 +8,30 @@ const login = async (req, res) => {
         if (!phone) return res.status(400).json({ success: false, message: "Phone is required" });
 
         let user = await User.findOne({ phone });
-        if (!user) user = await User.create({ phone });
+        
+        // If user doesn't exist, create with pending status
+        if (!user) {
+            user = await User.create({ phone, status: "pending" });
+            return res.status(200).json({ 
+                success: false, 
+                message: "Your account is pending approval. Please wait for admin approval.",
+                data: user 
+            });
+        }
+
+        // Check user status - only approved users can login
+        if (user.status !== "approved") {
+            const statusMessages = {
+                pending: "Your account is pending approval. Please wait for admin approval.",
+                rejected: "Your account has been rejected. Please contact admin.",
+                blocked: "Your account has been blocked. Please contact admin.",
+            };
+            return res.status(403).json({ 
+                success: false, 
+                message: statusMessages[user.status] || "Your account is not approved.",
+                data: { status: user.status }
+            });
+        }
 
         // Include phone in JWT
         const token = jwt.sign(
@@ -65,10 +88,17 @@ const completeProfile = async (req, res) => {
     }
 };
 
-// Get all users
+// Get all users (with optional status filter)
 const getUsers = async (req, res) => {
     try {
-        const users = await User.find();
+        const { status } = req.query;
+        const filter = {};
+        
+        if (status && ["pending", "approved", "rejected", "blocked"].includes(status.toLowerCase())) {
+            filter.status = status.toLowerCase();
+        }
+
+        const users = await User.find(filter).sort({ createdAt: -1 });
         res.status(200).json({ success: true, data: users });
     } catch (error) {
         res.status(500).json({ success: false, message: "Failed to fetch users", error: error.message });
@@ -113,14 +143,66 @@ const updateUserRole = async (req, res) => {
     }
 };
 
-// Delete user (admin only or by ID if needed)
+// Delete user (admin only)
 const deleteUser = async (req, res) => {
     try {
-        const user = await User.findByIdAndDelete(req.user.id);
+        const role = (req.user?.role || "").toString().trim().toLowerCase();
+        if (role !== "admin") {
+            return res.status(403).json({ success: false, message: "Only admin can delete users" });
+        }
+
+        const { id } = req.params;
+        if (!id) {
+            return res.status(400).json({ success: false, message: "User ID is required" });
+        }
+
+        const user = await User.findByIdAndDelete(id);
         if (!user) return res.status(404).json({ success: false, message: "User not found" });
         res.status(200).json({ success: true, message: "User deleted successfully" });
     } catch (error) {
         res.status(500).json({ success: false, message: "Failed to delete user", error: error.message });
+    }
+};
+
+// Update user status (admin only) - approve, reject, block
+const updateUserStatus = async (req, res) => {
+    try {
+        const role = (req.user?.role || "").toString().trim().toLowerCase();
+        if (role !== "admin") {
+            return res.status(403).json({ success: false, message: "Only admin can update user status" });
+        }
+
+        const { id } = req.params;
+        const { status } = req.body;
+
+        if (!id) {
+            return res.status(400).json({ success: false, message: "User ID is required" });
+        }
+
+        if (!status || !["pending", "approved", "rejected", "blocked"].includes(status.toLowerCase())) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "status must be one of: pending, approved, rejected, blocked" 
+            });
+        }
+
+        const user = await User.findByIdAndUpdate(
+            id,
+            { status: status.toLowerCase() },
+            { new: true }
+        );
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        res.status(200).json({ 
+            success: true, 
+            message: `User status updated to ${status}`,
+            data: user 
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Failed to update user status", error: error.message });
     }
 };
 
@@ -172,4 +254,5 @@ module.exports = {
     updateUserRole,
     deleteUser,
     updateProfile,
+    updateUserStatus,
 };

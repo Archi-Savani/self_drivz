@@ -16,7 +16,7 @@ const fleetOwnerKycSchema = new mongoose.Schema(
         panCard: { type: String, required: true }, // Cloudinary URL
         gstNum: { type: String },
         gstCertificate: { type: String }, // Cloudinary URL
-        status: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
+        status: { type: String, enum: ["pending", "approved", "rejected", "block"], default: "pending", lowercase: true },
     },
     { timestamps: true }
 );

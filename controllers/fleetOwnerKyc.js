@@ -132,12 +132,12 @@ const updateFleetOwnerKycStatus = async (req, res) => {
         const { id } = req.params;
         const { status } = req.body;
 
-        if (!status || !["pending", "approved", "rejected"].includes(status)) {
-            return res.status(400).json({ success: false, message: "Invalid status. Must be pending, approved, or rejected" });
+        if (!status || !["pending", "approved", "rejected", "block"].includes(status.toLowerCase())) {
+            return res.status(400).json({ success: false, message: "Invalid status. Must be pending, approved, rejected, or block" });
         }
 
         const update = {
-            status,
+            status: status.toLowerCase(),
         };
 
         const fleetOwnerKyc = await FleetOwnerKyc.findByIdAndUpdate(id, update, { new: true });
@@ -253,8 +253,8 @@ const updateFleetOwnerKyc = async (req, res) => {
 
         if (isAdmin) {
             // Admin can also change status if valid
-            if (status && ["pending", "approved", "rejected"].includes(status)) {
-                updateData.status = status;
+            if (status && ["pending", "approved", "rejected", "block"].includes(status.toLowerCase())) {
+                updateData.status = status.toLowerCase();
             }
         } else {
             // Non-admin: allow editing at any time; always reset status to pending for re-approval
@@ -268,15 +268,25 @@ const updateFleetOwnerKyc = async (req, res) => {
     }
 };
 
-// Delete FleetOwnerKyc (Admin only)
+// Delete FleetOwnerKyc (Admin only) - Also deletes the fleet owner user
 const deleteFleetOwnerKyc = async (req, res) => {
     try {
         const { id } = req.params;
-        const fleetOwnerKyc = await FleetOwnerKyc.findByIdAndDelete(id);
+        const fleetOwnerKyc = await FleetOwnerKyc.findById(id);
         if (!fleetOwnerKyc) {
             return res.status(404).json({ success: false, message: "FleetOwnerKyc not found" });
         }
-        res.status(200).json({ success: true, message: "FleetOwnerKyc deleted successfully" });
+
+        // Delete the fleet owner user by email
+        const User = require("../models/user");
+        if (fleetOwnerKyc.email) {
+            await User.findOneAndDelete({ email: fleetOwnerKyc.email, role: "FleetOwner" });
+        }
+
+        // Delete the KYC
+        await FleetOwnerKyc.findByIdAndDelete(id);
+        
+        res.status(200).json({ success: true, message: "FleetOwnerKyc and associated fleet owner user deleted successfully" });
     } catch (error) {
         res.status(500).json({ success: false, message: "Failed to delete FleetOwnerKyc", error: error.message });
     }

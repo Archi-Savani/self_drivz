@@ -2,6 +2,56 @@ const mongoose = require("mongoose");
 const Ride = require("../models/ride");
 const Car = require("../models/car");
 
+// Helper function to calculate ride status (ongoing if in time range)
+function calculateRideStatus(ride) {
+    const rideObj = ride.toObject ? ride.toObject() : ride;
+    const storedStatus = rideObj.status?.toLowerCase() || "pending";
+    
+    // Only calculate ongoing for approved rides
+    if (storedStatus !== "approve") {
+        return storedStatus;
+    }
+    
+    try {
+        const now = new Date();
+        const currentDateStr = now.toISOString().split("T")[0]; // YYYY-MM-DD
+        const currentTimeStr = now.toTimeString().slice(0, 5); // HH:MM
+        
+        const dateFrom = rideObj.date?.from || "";
+        const dateTo = rideObj.date?.to || "";
+        const timeFrom = rideObj.time?.from || "";
+        const timeTo = rideObj.time?.to || "";
+        
+        // Check if current time is within the ride's date/time range
+        const isAfterStart = currentDateStr > dateFrom || (currentDateStr === dateFrom && currentTimeStr >= timeFrom);
+        const isBeforeEnd = currentDateStr < dateTo || (currentDateStr === dateTo && currentTimeStr <= timeTo);
+        
+        if (isAfterStart && isBeforeEnd) {
+            return "ongoing";
+        }
+        
+        return storedStatus;
+    } catch (error) {
+        // If calculation fails, return stored status
+        return storedStatus;
+    }
+}
+
+// Helper function to process ride(s) and add calculated status
+function processRideStatus(ride) {
+    if (Array.isArray(ride)) {
+        return ride.map(r => {
+            const processed = r.toObject ? r.toObject() : { ...r };
+            processed.status = calculateRideStatus(r);
+            return processed;
+        });
+    } else {
+        const processed = ride.toObject ? ride.toObject() : { ...ride };
+        processed.status = calculateRideStatus(ride);
+        return processed;
+    }
+}
+
 function validateRanges(date, time) {
     if (!date || !time) return "date and time are required";
     if (!date.from || !date.to) return "date.from and date.to are required";
@@ -73,8 +123,10 @@ exports.createRide = async (req, res) => {
         if (locationError) return res.status(400).json({ success: false, message: locationError });
 
         const ride = await Ride.create({ carId, location, date, time, status: "pending" });
-
-        res.status(201).json({ success: true, data: await ride.populate("carId") });
+        await ride.populate("carId");
+        
+        const processedRide = processRideStatus(ride);
+        res.status(201).json({ success: true, data: processedRide });
     } catch (error) {
         res.status(500).json({ success: false, message: "Failed to create ride", error: error.message });
     }
@@ -85,7 +137,15 @@ exports.getRides = async (req, res) => {
         const { riderId, status, dateFrom, dateTo, page = 1, pageSize = 20, carId } = req.query;
         const filter = {};
         if (riderId) filter.riderId = riderId;
-        if (status) filter.status = status;
+        
+        // Handle status filter - if "ongoing", we need to filter for "approve" and then calculate
+        const statusFilter = status?.toLowerCase();
+        if (statusFilter === "ongoing") {
+            filter.status = "approve"; // Only approved rides can be ongoing
+        } else if (statusFilter) {
+            filter.status = statusFilter;
+        }
+        
         if (carId) {
             if (!mongoose.Types.ObjectId.isValid(carId)) {
                 return res.status(400).json({ success: false, message: "carId must be a valid id" });
@@ -101,12 +161,28 @@ exports.getRides = async (req, res) => {
         Object.keys(filter).forEach((k) => filter[k] === undefined && delete filter[k]);
 
         const skip = (Number(page) - 1) * Number(pageSize);
+        
+        // If filtering by "ongoing", we need to get all approved rides, calculate ongoing, then paginate
+        if (statusFilter === "ongoing") {
+            const allApprovedRides = await Ride.find(filter).sort({ createdAt: -1 }).populate("carId");
+            const processedAll = processRideStatus(allApprovedRides);
+            const ongoingRides = processedAll.filter(item => item.status === "ongoing");
+            const total = ongoingRides.length;
+            const items = ongoingRides.slice(skip, skip + Number(pageSize));
+            
+            return res.json({ success: true, data: { items, page: Number(page), pageSize: Number(pageSize), total } });
+        }
+        
+        // Normal filtering for other statuses
         const [items, total] = await Promise.all([
             Ride.find(filter).sort({ createdAt: -1 }).skip(skip).limit(Number(pageSize)).populate("carId"),
             Ride.countDocuments(filter),
         ]);
 
-        res.json({ success: true, data: { items, page: Number(page), pageSize: Number(pageSize), total } });
+        // Process status (calculate ongoing)
+        const processedItems = processRideStatus(items);
+
+        res.json({ success: true, data: { items: processedItems, page: Number(page), pageSize: Number(pageSize), total } });
     } catch (error) {
         res.status(500).json({ success: false, message: "Failed to get rides", error: error.message });
     }
@@ -116,7 +192,9 @@ exports.getRideById = async (req, res) => {
     try {
         const ride = await Ride.findById(req.params.id).populate("carId");
         if (!ride) return res.status(404).json({ success: false, message: "Ride not found" });
-        res.json({ success: true, data: ride });
+        
+        const processedRide = processRideStatus(ride);
+        res.json({ success: true, data: processedRide });
     } catch (error) {
         res.status(500).json({ success: false, message: "Failed to get ride", error: error.message });
     }
@@ -174,7 +252,9 @@ exports.updateRide = async (req, res) => {
         Object.assign(ride, update);
         await ride.save();
         await ride.populate("carId");
-        res.json({ success: true, data: ride });
+        
+        const processedRide = processRideStatus(ride);
+        res.json({ success: true, data: processedRide });
     } catch (error) {
         res.status(500).json({ success: false, message: "Failed to update ride", error: error.message });
     }
@@ -183,16 +263,22 @@ exports.updateRide = async (req, res) => {
 exports.updateRideStatus = async (req, res) => {
     try {
         const { status } = req.body;
-        if (!["approve", "reject"].includes(status)) {
-            return res.status(400).json({ success: false, message: "status must be approve or reject" });
+        const normalizedStatus = status?.toLowerCase();
+        
+        // Don't allow setting ongoing manually - it's auto-calculated
+        if (!["approve", "reject", "pending"].includes(normalizedStatus)) {
+            return res.status(400).json({ success: false, message: "status must be approve, reject, or pending. Ongoing status is automatically calculated." });
         }
+        
         const ride = await Ride.findByIdAndUpdate(
             req.params.id,
-            { status },
+            { status: normalizedStatus },
             { new: true }
         ).populate("carId");
         if (!ride) return res.status(404).json({ success: false, message: "Ride not found" });
-        res.json({ success: true, data: ride });
+        
+        const processedRide = processRideStatus(ride);
+        res.json({ success: true, data: processedRide });
     } catch (error) {
         res.status(500).json({ success: false, message: "Failed to update status", error: error.message });
     }

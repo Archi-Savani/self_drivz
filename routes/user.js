@@ -10,8 +10,9 @@ const {
     login,
     updateUserRole,
     getMe,
+    updateUserStatus,
 } = require("../controllers/user");
-const {auth} = require("../middlewares/auth");
+const {auth, requireAdmin} = require("../middlewares/auth");
 
 const router = express.Router();
 const upload = multer(); // stores files in memory
@@ -19,13 +20,15 @@ const upload = multer(); // stores files in memory
 router.post("/login", login);
 router.get("/me", auth, getMe);
 router.post("/complete-profile", auth, upload.single("photo"), uploadSingleImage, completeProfile);
-router.get("/", getUsers);
+router.get("/", auth, getUsers);
 router.put("/:id", auth, upload.single("photo"), uploadSingleImage, updateProfile);
-router.delete("/:id", deleteUser);
+router.delete("/:id", auth, requireAdmin, deleteUser);
 
 // Role update (protected)
-// routes/userRoutes.js
 router.put("/:id/role", auth, updateUserRole);
+
+// Admin only: Update user status (approve, reject, block)
+router.put("/:id/status", auth, requireAdmin, updateUserStatus);
 
 
 module.exports = router;
