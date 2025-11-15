@@ -88,14 +88,26 @@ const completeProfile = async (req, res) => {
     }
 };
 
-// Get all users (with optional status filter)
+// Get all users (with optional status and role filter)
 const getUsers = async (req, res) => {
     try {
-        const { status } = req.query;
+        const { status, role } = req.query;
         const filter = {};
         
         if (status && ["pending", "approved", "rejected", "blocked"].includes(status.toLowerCase())) {
             filter.status = status.toLowerCase();
+        }
+
+        if (role) {
+            const normalizedRole = role.toString().trim();
+            if (["Rider", "FleetOwner"].includes(normalizedRole)) {
+                filter.role = normalizedRole;
+            } else {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: "Invalid role. Must be 'Rider' or 'FleetOwner'" 
+                });
+            }
         }
 
         const users = await User.find(filter).sort({ createdAt: -1 });

@@ -49,6 +49,9 @@ router.put("/:id/approve", auth, requireAdmin, carController.approveCar);
 // Admin only: Reject car
 router.put("/:id/reject", auth, requireAdmin, carController.rejectCar);
 
+// Admin only: Block car
+router.put("/:id/block", auth, requireAdmin, carController.blockCar);
+
 // Admin only: Update car status
 router.put("/:id/status", auth, requireAdmin, carController.updateCarStatus);
 

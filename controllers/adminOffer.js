@@ -5,7 +5,6 @@ const AdminOffer = require("../models/adminOffer");
 const createOffer = async (req, res) => {
     try {
         const {
-            offerFor,
             title,
             offerCode,
             subtitle,
@@ -14,12 +13,11 @@ const createOffer = async (req, res) => {
             expiryDate,
         } = req.body;
 
-        if (!offerFor || !title || !offerCode || discount === undefined || !expiryDate) {
-            return res.status(400).json({ success: false, message: "offerFor, title, offerCode, discount, expiryDate are required" });
+        if (!title || !offerCode || discount === undefined || !expiryDate) {
+            return res.status(400).json({ success: false, message: "title, offerCode, discount, expiryDate are required" });
         }
 
         const payload = {
-            offerFor: String(offerFor).toLowerCase(),
             title,
             offerCode,
             subtitle,
@@ -81,7 +79,6 @@ const getOfferById = async (req, res) => {
 const updateOffer = async (req, res) => {
     try {
         const {
-            offerFor,
             title,
             offerCode,
             subtitle,
@@ -91,7 +88,6 @@ const updateOffer = async (req, res) => {
         } = req.body;
 
         const update = {};
-        if (offerFor !== undefined) update.offerFor = String(offerFor).toLowerCase();
         if (title !== undefined) update.title = title;
         if (offerCode !== undefined) update.offerCode = offerCode;
         if (subtitle !== undefined) update.subtitle = subtitle;

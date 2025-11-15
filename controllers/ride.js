@@ -123,6 +123,10 @@ exports.createRide = async (req, res) => {
         if (locationError) return res.status(400).json({ success: false, message: locationError });
 
         const ride = await Ride.create({ carId, location, date, time, status: "pending" });
+        
+        // Update car status to ongoing when ride is booked
+        await Car.findByIdAndUpdate(carId, { status: "ongoing" });
+        
         await ride.populate("carId");
         
         const processedRide = processRideStatus(ride);
@@ -270,13 +274,26 @@ exports.updateRideStatus = async (req, res) => {
             return res.status(400).json({ success: false, message: "status must be approve, reject, or pending. Ongoing status is automatically calculated." });
         }
         
-        const ride = await Ride.findByIdAndUpdate(
-            req.params.id,
-            { status: normalizedStatus },
-            { new: true }
-        ).populate("carId");
+        const ride = await Ride.findById(req.params.id);
         if (!ride) return res.status(404).json({ success: false, message: "Ride not found" });
         
+        // Update ride status
+        ride.status = normalizedStatus;
+        await ride.save();
+        
+        // Update car status based on ride status
+        if (normalizedStatus === "reject") {
+            // If ride is rejected, set car status back to approved (if it was ongoing)
+            const car = await Car.findById(ride.carId);
+            if (car && car.status === "ongoing") {
+                await Car.findByIdAndUpdate(ride.carId, { status: "approved" });
+            }
+        } else if (normalizedStatus === "approve") {
+            // If ride is approved, set car status to ongoing
+            await Car.findByIdAndUpdate(ride.carId, { status: "ongoing" });
+        }
+        
+        await ride.populate("carId");
         const processedRide = processRideStatus(ride);
         res.json({ success: true, data: processedRide });
     } catch (error) {

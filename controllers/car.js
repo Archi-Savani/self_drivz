@@ -94,7 +94,7 @@ const addCar = async (req, res) => {
             status: "pending", // Always pending when submitted
         });
 
-        // Only admin can set fleetBy; ignore for fleet owners
+        // Set fleetBy: admin can specify, fleet owners auto-set from their account
         if (role === "admin" && typeof fleetBy !== "undefined" && fleetBy !== null && fleetBy !== "") {
             if (!mongoose.Types.ObjectId.isValid(fleetBy)) {
                 return res.status(400).json({ success: false, message: "fleetBy must be a valid user id" });
@@ -107,6 +107,9 @@ const addCar = async (req, res) => {
                 return res.status(400).json({ success: false, message: "fleetBy must reference a FleetOwner user" });
             }
             newCar.fleetBy = ownerUser._id;
+        } else if (role === "fleetowner" && req.user?._id) {
+            // Auto-set fleetBy from authenticated fleet owner
+            newCar.fleetBy = req.user._id;
         }
 
         await newCar.save();
@@ -121,15 +124,35 @@ const addCar = async (req, res) => {
     }
 };
 
-// Get all cars (only approved and available cars for public, all for admin)
+// Get all cars (only approved and available cars for public, all for admin except deleted)
 const getCars = async (req, res) => {
     try {
         const role = (req.user?.role || "").toString().trim().toLowerCase();
+        const { fleetBy } = req.query;
         let query = {};
 
-        // Non-admin users only see approved and available cars
+        // Non-admin users only see approved and available cars (not deleted, blocked, or pending)
         if (role !== "admin") {
             query = { status: "approved", carstatus: "available" };
+        } else {
+            // Admin can see all except deleted cars
+            query = { status: { $ne: "delete" } };
+        }
+
+        // Filter by fleetBy if provided
+        if (fleetBy) {
+            if (!mongoose.Types.ObjectId.isValid(fleetBy)) {
+                return res.status(400).json({ success: false, message: "fleetBy must be a valid user id" });
+            }
+            // Verify the user exists and is a FleetOwner
+            const fleetOwner = await User.findById(fleetBy);
+            if (!fleetOwner) {
+                return res.status(404).json({ success: false, message: "Fleet owner not found" });
+            }
+            if (fleetOwner.role !== "FleetOwner") {
+                return res.status(400).json({ success: false, message: "fleetBy must reference a FleetOwner user" });
+            }
+            query.fleetBy = fleetBy; // Mongoose will automatically convert string to ObjectId
         }
 
         let queryBuilder = Car.find(query).sort({ createdAt: -1 });
@@ -146,15 +169,22 @@ const getCars = async (req, res) => {
 // Get single car by ID
 const getCarById = async (req, res) => {
     try {
-        let queryBuilder = Car.findById(req.params.id);
         const role = (req.user?.role || "").toString().trim().toLowerCase();
+        let queryBuilder = Car.findById(req.params.id);
+        
+        // Exclude deleted cars for non-admin users
         if (role !== "admin") {
             queryBuilder = queryBuilder.select("-fleetBy");
         }
+        
         const car = await queryBuilder;
         if (!car) return res.status(404).json({ success: false, message: "Car not found" });
 
-        // Non-admin users can see pending cars if they own them, but for now show all
+        // Non-admin users cannot see deleted or blocked cars
+        if (role !== "admin" && (car.status === "delete" || car.status === "block")) {
+            return res.status(404).json({ success: false, message: "Car not found" });
+        }
+
         res.status(200).json({ success: true, data: car });
     } catch (error) {
         res.status(500).json({ success: false, message: "Failed to fetch car", error: error.message });
@@ -167,6 +197,15 @@ const updateCar = async (req, res) => {
         const role = (req.user?.role || "").toString().trim().toLowerCase();
         if (role === "rider") {
             return res.status(403).json({ success: false, message: "Riders cannot update cars" });
+        }
+
+        // Check if car exists and is not deleted
+        const existingCar = await Car.findById(req.params.id);
+        if (!existingCar) {
+            return res.status(404).json({ success: false, message: "Car not found" });
+        }
+        if (existingCar.status === "delete") {
+            return res.status(400).json({ success: false, message: "Cannot update a deleted car" });
         }
 
         const {
@@ -274,18 +313,22 @@ const updateCar = async (req, res) => {
     }
 };
 
-// Delete car - FleetOwner and Admin only
+// Delete car - Admin only (soft delete: sets status to 'delete')
 const deleteCar = async (req, res) => {
     try {
         const role = (req.user?.role || "").toString().trim().toLowerCase();
-        if (role === "rider") {
-            return res.status(403).json({ success: false, message: "Riders cannot delete cars" });
+        if (role !== "admin") {
+            return res.status(403).json({ success: false, message: "Only admin can delete cars" });
         }
 
-        const car = await Car.findByIdAndDelete(req.params.id);
+        const car = await Car.findByIdAndUpdate(
+            req.params.id,
+            { status: "delete", carstatus: "unavailable" },
+            { new: true }
+        );
         if (!car) return res.status(404).json({ success: false, message: "Car not found" });
 
-        res.status(200).json({ success: true, message: "Car deleted successfully" });
+        res.status(200).json({ success: true, message: "Car deleted successfully. Car will no longer be visible.", data: car });
     } catch (error) {
         res.status(500).json({ success: false, message: "Failed to delete car", error: error.message });
     }
@@ -333,6 +376,27 @@ const rejectCar = async (req, res) => {
     }
 };
 
+// Block car - Admin only
+const blockCar = async (req, res) => {
+    try {
+        const role = (req.user?.role || "").toString().trim().toLowerCase();
+        if (role !== "admin") {
+            return res.status(403).json({ success: false, message: "Only admin can block cars" });
+        }
+
+        const car = await Car.findByIdAndUpdate(
+            req.params.id,
+            { status: "block", carstatus: "unavailable" },
+            { new: true }
+        );
+        if (!car) return res.status(404).json({ success: false, message: "Car not found" });
+
+        res.status(200).json({ success: true, message: "Car blocked successfully", data: car });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Failed to block car", error: error.message });
+    }
+};
+
 // Update car status - Admin only
 const updateCarStatus = async (req, res) => {
     try {
@@ -342,16 +406,17 @@ const updateCarStatus = async (req, res) => {
         }
 
         const { status } = req.body;
-        if (!status || !["pending", "approved", "rejected"].includes(status.toLowerCase())) {
-            return res.status(400).json({ success: false, message: "Invalid status. Must be pending, approved, or rejected" });
+        const validStatuses = ["pending", "approved", "rejected", "block", "delete"];
+        if (!status || !validStatuses.includes(status.toLowerCase())) {
+            return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
         }
 
         const updateData = { status: status.toLowerCase() };
         
-        // If approving, set carstatus to available
+        // Set carstatus based on status
         if (status.toLowerCase() === "approved") {
             updateData.carstatus = "available";
-        } else if (status.toLowerCase() === "rejected") {
+        } else if (["rejected", "block", "delete"].includes(status.toLowerCase())) {
             updateData.carstatus = "unavailable";
         }
 
@@ -372,5 +437,6 @@ module.exports = {
     deleteCar,
     approveCar,
     rejectCar,
+    blockCar,
     updateCarStatus,
 };

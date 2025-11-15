@@ -3,14 +3,6 @@ const mongoose = require("mongoose");
 
 const adminOfferSchema = new mongoose.Schema(
     {
-        offerFor: {
-            type: String,
-            enum: ["rider", "fleetowner"],
-            required: true,
-            lowercase: true,
-            trim: true,
-            index: true,
-        },
         title: {
             type: String,
             required: true,
